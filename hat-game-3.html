@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hat Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f0f9ff;
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #fff;
+    }
+    #overlay, #resultScreen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #overlay img {
+      width: 80%;
+      max-width: 300px;
+      margin-bottom: 20px;
+    }
+    #overlay input {
+      padding: 10px;
+      font-size: 18px;
+      width: 60%;
+      max-width: 300px;
+      margin-bottom: 10px;
+    }
+    #overlay button {
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #countdown {
+      font-size: 60px;
+      color: white;
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+    }
+    .arrow {
+      position: absolute;
+      bottom: 20px;
+      font-size: 40px;
+      color: rgba(255,255,255,0.8);
+      z-index: 5;
+    }
+    .arrow.left { left: 20px; }
+    .arrow.right { right: 20px; }
+    #resultScreen {
+      flex-direction: column;
+      background: rgba(0,0,0,0.9);
+    }
+    #leaderboard {
+      background: #fff;
+      color: #000;
+      padding: 10px;
+      max-width: 300px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    #leaderboard h2 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+    #leaderboard ol {
+      padding-left: 20px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <img src="https://via.placeholder.com/300x200/007BFF/ffffff?text=How+to+Play" alt="Instructions"/>
+  <input type="text" id="playerName" placeholder="Enter your name" />
+  <button onclick="startCountdown()">GO!</button>
+</div>
+
+<div id="countdown"></div>
+<div class="arrow left" id="leftArrow">⬅️</div>
+<div class="arrow right" id="rightArrow">➡️</div>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<div id="resultScreen" style="display:none;">
+  <h1 id="resultTitle">Game Over</h1>
+  <p id="finalScore">Your score: 0</p>
+  <div id="leaderboard">
+    <h2>🏆 Top 10 Players</h2>
+    <ol id="scoreList"></ol>
+  </div>
+</div>
+
+<audio id="ding1" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_6e5c2c3f05.mp3?filename=bell-6164.mp3"></audio>
+<audio id="ding2" src="https://cdn.pixabay.com/download/audio/2021/08/09/audio_6e6d3c3f73.mp3?filename=collectcoin-6079.mp3"></audio>
+<audio id="boom" src="https://cdn.pixabay.com/download/audio/2022/02/23/audio_7c1f47a4c4.mp3?filename=explosion-6089.mp3"></audio>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD-L6IJiRU-1KDozgViDCX1GDzD5UcQtxs",
+  authDomain: "qqcats-likes.firebaseapp.com",
+  databaseURL: "https://qqcats-likes-default-rtdb.firebaseio.com",
+  projectId: "qqcats-likes",
+  storageBucket: "qqcats-likes.firebasestorage.app",
+  messagingSenderId: "764146630860",
+  appId: "1:764146630860:web:90bce3ce1c9ba7a64f4269",
+  measurementId: "G-HT60277WQZ"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Game logic
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let player = { x: 175, y: 550, width: 50, height: 50 };
+let hats = [];
+let score = 0;
+let isPlaying = false;
+let playerName = '';
+let gameDuration = 30;
+let countdownNum = 3;
+
+function startCountdown() {
+  playerName = document.getElementById('playerName').value.trim();
+  if (!playerName) return alert("Please enter your name!");
+  document.getElementById('overlay').style.display = 'none';
+
+  let countdown = document.getElementById('countdown');
+  countdown.style.display = 'block';
+
+  let interval = setInterval(() => {
+    countdown.innerText = countdownNum;
+    countdownNum--;
+    if (countdownNum < 0) {
+      clearInterval(interval);
+      countdown.style.display = 'none';
+      startGame();
+    }
+  }, 1000);
+}
+
+function startGame() {
+  isPlaying = true;
+  score = 0;
+  player.x = 175;
+
+  hats = [];
+  setInterval(spawnHat, 800);
+  setInterval(() => {
+    if (gameDuration > 0) gameDuration--;
+    else endGame();
+  }, 1000);
+
+  showArrows();
+  gameLoop();
+}
+
+function spawnHat() {
+  if (!isPlaying) return;
+  const types = ['normal', 'gold', 'bad'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  hats.push({
+    x: Math.random() * 350,
+    y: 0,
+    width: 40,
+    height: 40,
+    type: type
+  });
+}
+
+function playSound(type) {
+  if (type === 'normal') document.getElementById('ding1').play();
+  if (type === 'gold') document.getElementById('ding2').play();
+  if (type === 'bad') {
+    document.getElementById('boom').play();
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+}
+
+function gameLoop() {
+  if (!isPlaying) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw player
+  ctx.fillStyle = 'blue';
+  ctx.beginPath();
+  ctx.arc(player.x + 25, player.y + 25, 25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw hats
+  hats.forEach((hat, i) => {
+    hat.y += 4;
+    if (
+      hat.y + hat.height > player.y &&
+      hat.x < player.x + player.width &&
+      hat.x + hat.width > player.x &&
+      hat.y < player.y + player.height
+    ) {
+      if (hat.type === 'bad') {
+        score -= 5;
+      } else if (hat.type === 'gold') {
+        score += 5;
+      } else {
+        score += 1;
+      }
+      playSound(hat.type);
+      hats.splice(i, 1);
+    } else if (hat.y > canvas.height) {
+      hats.splice(i, 1);
+    }
+
+    ctx.fillStyle = hat.type === 'bad' ? 'red' : hat.type === 'gold' ? 'gold' : 'black';
+    ctx.fillRect(hat.x, hat.y, hat.width, hat.height);
+  });
+
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  isPlaying = false;
+  document.getElementById('resultScreen').style.display = 'flex';
+  document.getElementById('resultTitle').innerText = score >= 30 ? '🎉 Congratulations!' : '😢 Game Over';
+  document.getElementById('finalScore').innerText = `Your score: ${score}`;
+  updateLeaderboard();
+}
+
+function updateLeaderboard() {
+  const scoreRef = ref(db, 'hatGameScores/' + playerName);
+  get(scoreRef).then(snapshot => {
+    const current = snapshot.val();
+    if (!current || current < score) set(scoreRef, score);
+  });
+
+  const topRef = ref(db, 'hatGameScores');
+  get(topRef).then(snapshot => {
+    const data = snapshot.val() || {};
+    const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]).slice(0,10);
+    document.getElementById('scoreList').innerHTML = sorted.map(([name, sc]) => `<li>${name}: ${sc}</li>`).join('');
+  });
+}
+
+function showArrows() {
+  document.getElementById('leftArrow').style.display = 'block';
+  document.getElementById('rightArrow').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('leftArrow').style.display = 'none';
+    document.getElementById('rightArrow').style.display = 'none';
+  }, 5000);
+}
+
+document.addEventListener('keydown', e => {
+  if (!isPlaying) return;
+  if (e.key === 'ArrowLeft') player.x -= 20;
+  if (e.key === 'ArrowRight') player.x += 20;
+});
+</script>
+
+</body>
+</html>
