@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>接帽遊戲</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem 0;
+      background: #f9f9f9;
+      font-family: sans-serif;
+    }
+    .game-container {
+      max-width: 400px;
+      height: 600px;
+      margin: 0 auto;
+      background: white;
+      border: 2px solid #000;
+      position: relative;
+      overflow: hidden;
+    }
+    #player {
+      width: 60px;
+      height: 60px;
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-image: url('https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6070.png?v=1750900443');
+      background-size: contain;
+      background-repeat: no-repeat;
+      z-index: 10;
+    }
+    .item {
+      width: 40px;
+      height: 40px;
+      position: absolute;
+      top: 0;
+      background-size: contain;
+      background-repeat: no-repeat;
+      z-index: 5;
+    }
+    #score, #timer {
+      position: absolute;
+      top: 10px;
+      font-weight: bold;
+      font-size: 16px;
+      z-index: 20;
+    }
+    #score { left: 10px; }
+    #timer { right: 10px; }
+    #game-over {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 1rem;
+      font-size: 20px;
+      text-align: center;
+      z-index: 30;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container" id="game">
+    <div id="score">分數：0</div>
+    <div id="timer">時間：30</div>
+    <div id="player"></div>
+    <div id="game-over">遊戲結束！<br>你攞到 <span id="final-score"></span> 分！</div>
+  </div>
+
+  <script>
+    const game = document.getElementById('game');
+    const player = document.getElementById('player');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const gameOverBox = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+
+    let score = 0;
+    let timeLeft = 30;
+    let gameEnded = false;
+    let gameInterval, itemInterval;
+
+    function movePlayer(dir) {
+      const step = 20;
+      const left = player.offsetLeft;
+      const containerWidth = game.clientWidth;
+      if (dir === 'left' && left > 0) {
+        player.style.left = `${Math.max(0, left - step)}px`;
+      } else if (dir === 'right' && left + player.offsetWidth < containerWidth) {
+        player.style.left = `${Math.min(containerWidth - player.offsetWidth, left + step)}px`;
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') movePlayer('left');
+      if (e.key === 'ArrowRight') movePlayer('right');
+    });
+
+    game.addEventListener('click', e => {
+      const x = e.clientX - game.getBoundingClientRect().left;
+      const center = game.clientWidth / 2;
+      if (x < center) movePlayer('left');
+      else movePlayer('right');
+    });
+
+    function spawnItem() {
+      if (gameEnded) return;
+
+      const item = document.createElement('div');
+      item.className = 'item';
+
+      const types = [
+        { type: 'normal', img: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6047.png?v=1750779326' },
+        { type: 'gold', img: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6030.png?v=1750755696' },
+        { type: 'bomb', img: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6045.png?v=1750779326' }
+      ];
+      const random = types[Math.floor(Math.random() * types.length)];
+      item.dataset.type = random.type;
+      item.style.backgroundImage = `url(${random.img})`;
+      item.style.left = Math.random() * (game.clientWidth - 40) + 'px';
+
+      game.appendChild(item);
+
+      let top = 0;
+      const fall = setInterval(() => {
+        if (gameEnded) {
+          clearInterval(fall);
+          item.remove();
+          return;
+        }
+
+        top += 4;
+        item.style.top = `${top}px`;
+
+        const itemRect = item.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+
+        if (
+          itemRect.bottom >= playerRect.top &&
+          itemRect.left < playerRect.right &&
+          itemRect.right > playerRect.left
+        ) {
+          clearInterval(fall);
+          item.remove();
+
+          if (random.type === 'normal') score += 1;
+          if (random.type === 'gold') score += 5;
+          if (random.type === 'bomb') {
+            endGame();
+            return;
+          }
+
+          scoreEl.textContent = `分數：${score}`;
+        }
+
+        if (top > game.clientHeight) {
+          clearInterval(fall);
+          item.remove();
+        }
+      }, 16);
+    }
+
+    function startGame() {
+      // 初始位置置中
+      player.style.left = `${(game.clientWidth - player.offsetWidth) / 2}px`;
+
+      gameInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `時間：${timeLeft}`;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+
+      itemInterval = setInterval(spawnItem, 800);
+    }
+
+    function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(itemInterval);
+      gameEnded = true;
+      finalScoreEl.textContent = score;
+      gameOverBox.style.display = 'block';
+    }
+
+    window.onload = startGame;
+  </script>
+</body>
+</html>
