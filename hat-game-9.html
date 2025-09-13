@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>接帽遊戲（Firebase 排行榜）</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      font-family: sans-serif;
+    }
+    .game-container {
+      max-width: 400px;
+      height: 600px;
+      margin: 0 auto;
+      background: #fff;
+      border: 2px solid #000;
+      position: relative;
+      overflow: hidden;
+    }
+    #player {
+      width: 65px;
+      height: 65px;
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-image: url('https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6726.png?v=1757693802');
+      background-size: contain;
+      background-repeat: no-repeat;
+      z-index: 10;
+    }
+    .item {
+      width: 60px;
+      height: 60px;
+      position: absolute;
+      top: 0;
+      background-size: contain;
+      background-repeat: no-repeat;
+      z-index: 5;
+    }
+    #score, #timer {
+      position: absolute;
+      top: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #000;
+      z-index: 20;
+    }
+    #score { left: 10px; }
+    #timer { right: 10px; }
+
+    #game-over {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 2rem 1rem;
+      z-index: 999;
+      width: 90%;
+      max-width: 350px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    #name-input, #restart-btn, #submit-btn, #try-again-btn {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #leaderboard {
+      margin-top: 1rem;
+      text-align: left;
+      background: #fff;
+      color: #000;
+      padding: 0.5rem;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #admin-btn, #reset-btn {
+      position: fixed;
+      right: 10px;
+      z-index: 9999;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: none;
+    }
+    #admin-btn {
+      bottom: 10px;
+      background: #333;
+      color: #fff;
+    }
+    #reset-btn {
+      bottom: 60px;
+      background: #f44336;
+      color: #fff;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container" id="game">
+    <div id="score">分數：0</div>
+    <div id="timer">時間：30</div>
+    <div id="player"></div>
+    <div id="game-over">
+      <h2>🎮 遊戲結束！</h2>
+      <div id="below30">
+        <p>你得 <span id="final-score"></span> 分咋🤏🏻咩帽都拎唔到🤣<br>嗱嗱聲玩過啦✨️</p>
+        <button id="restart-btn">再接再厲</button>
+      </div>
+      <div id="above30" style="display:none;">
+        <p>恭喜你得到 <span id="final-score2"></span> 分👏🏻<br>留低你個大名🪪</p>
+        <input type="text" id="name-input" placeholder="輸入你個名" />
+        <br>
+        <button id="submit-btn">確認</button>
+        <div id="leaderboard"></div>
+        <button id="try-again-btn" style="display:none;">再嘗試</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理員功能 -->
+  <button id="admin-btn">🔒 管理員功能</button>
+  <button id="reset-btn">⚠️ Reset 排行榜</button>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDTIK2NjCJlj9oPDqLXz8QmuStQdh0i-lw",
+      authDomain: "qqcats-hat.firebaseapp.com",
+      databaseURL: "https://qqcats-hat-default-rtdb.firebaseio.com",
+      projectId: "qqcats-hat",
+      storageBucket: "qqcats-hat.firebasestorage.app",
+      messagingSenderId: "791295966582",
+      appId: "1:791295966582:web:9476b4aba98b8d9757ce57",
+      measurementId: "G-J2FHPNW90V"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+    const db = firebase.database();
+
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const player = document.getElementById('player');
+    const game = document.getElementById('game');
+    const gameOverBox = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalScoreEl2 = document.getElementById('final-score2');
+    const restartBtn = document.getElementById('restart-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const tryAgainBtn = document.getElementById('try-again-btn');
+    const nameInput = document.getElementById('name-input');
+    const leaderboardEl = document.getElementById('leaderboard');
+    const below30 = document.getElementById('below30');
+    const above30 = document.getElementById('above30');
+    const adminBtn = document.getElementById('admin-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    let score = 0;
+    let timeLeft = 30;
+    let gameEnded = false;
+    let gameInterval, itemInterval;
+    let playerX = 0;
+    const step = 30;
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') movePlayer('left');
+      if (e.key === 'ArrowRight') movePlayer('right');
+    });
+
+    game.addEventListener('click', e => {
+      const x = e.clientX - game.getBoundingClientRect().left;
+      const center = game.clientWidth / 2;
+      if (x < center) movePlayer('left');
+      else movePlayer('right');
+    });
+
+    function movePlayer(dir) {
+      const maxOffset = (game.clientWidth - player.offsetWidth) / 2;
+      if (dir === 'left') playerX = Math.max(playerX - step, -maxOffset);
+      if (dir === 'right') playerX = Math.min(playerX + step, maxOffset);
+      player.style.transform = `translateX(${playerX}px) translateX(-50%)`;
+    }
+
+    function getRandomItemType() {
+      const r = Math.random();
+      if (r < 0.6) return 'normal';
+      else if (r < 0.9) return 'bomb';
+      else return 'gold';
+    }
+
+    function spawnItem() {
+      if (gameEnded) return;
+      const item = document.createElement('div');
+      item.className = 'item';
+      const type = getRandomItemType();
+      const images = {
+        normal: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6729.png?v=1757693802',
+        gold: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6731.png?v=1757694398',
+        bomb: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6728.png?v=1757693803'
+      };
+      item.dataset.type = type;
+      item.style.backgroundImage = `url(${images[type]})`;
+      item.style.left = Math.random() * (game.clientWidth - 60) + 'px';
+      game.appendChild(item);
+
+      let top = 0;
+      const fall = setInterval(() => {
+        if (gameEnded) {
+          clearInterval(fall);
+          item.remove();
+          return;
+        }
+        top += type === 'gold' ? 6 : 3;
+        item.style.top = `${top}px`;
+
+        const itemRect = item.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+
+        if (
+          itemRect.bottom >= playerRect.top &&
+          itemRect.left < playerRect.right &&
+          itemRect.right > playerRect.left
+        ) {
+          clearInterval(fall);
+          item.remove();
+          if (type === 'normal') score += 1;
+          if (type === 'gold') score += 5;
+          if (type === 'bomb') {
+            endGame();
+            return;
+          }
+          scoreEl.textContent = `分數：${score}`;
+        }
+
+        if (top > game.clientHeight) {
+          clearInterval(fall);
+          item.remove();
+        }
+      }, 16);
+    }
+
+    function startGame() {
+      score = 0;
+      timeLeft = 30;
+      gameEnded = false;
+      playerX = 0;
+      document.querySelectorAll('.item').forEach(el => el.remove());
+      scoreEl.textContent = `分數：0`;
+      timerEl.textContent = `時間：30`;
+      player.style.transform = `translateX(0px) translateX(-50%)`;
+      gameOverBox.style.display = 'none';
+      leaderboardEl.innerHTML = '';
+      tryAgainBtn.style.display = 'none';
+      nameInput.value = '';
+      nameInput.disabled = false;
+      submitBtn.disabled = false;
+      gameInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `時間：${timeLeft}`;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+      itemInterval = setInterval(spawnItem, 800);
+    }
+
+    function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(itemInterval);
+      gameEnded = true;
+      gameOverBox.style.display = 'block';
+
+      if (score < 30) {
+        finalScoreEl.textContent = score;
+        below30.style.display = 'block';
+        above30.style.display = 'none';
+      } else {
+        finalScoreEl2.textContent = score;
+        below30.style.display = 'none';
+        above30.style.display = 'block';
+      }
+    }
+
+    restartBtn.addEventListener('click', startGame);
+    tryAgainBtn.addEventListener('click', startGame);
+
+    submitBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim() || '無名氏';
+
+      // ✅ 防止重複提交
+      nameInput.disabled = true;
+      submitBtn.disabled = true;
+
+      const timestamp = Date.now();
+      db.ref("scores/" + timestamp).set({ name, score, time: timestamp }).then(() => {
+        showLeaderboard();
+      });
+    });
+
+    function showLeaderboard() {
+      db.ref("scores").once("value", snapshot => {
+        const data = snapshot.val() || {};
+        const entries = Object.values(data);
+        entries.sort((a, b) => b.score - a.score);
+        leaderboardEl.innerHTML = "<h3>🎖️ 排行榜</h3><ol>" +
+          entries.map(e => `<li>${e.name} - ${e.score} 分</li>`).join("") +
+          "</ol>";
+        tryAgainBtn.style.display = 'inline-block';
+      });
+    }
+
+    // ✅ 管理員密碼驗證
+    const adminPassword = "123456";
+
+    adminBtn.addEventListener('click', () => {
+      const input = prompt("請輸入管理員密碼：");
+      if (input === adminPassword) {
+        alert("登入成功 ✅");
+        resetBtn.style.display = 'block';
+      } else {
+        alert("密碼錯誤 ❌");
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (confirm("⚠️ 確定要清空排行榜？此操作不能還原！")) {
+        db.ref("scores").remove()
+          .then(() => {
+            alert("排行榜已清空 ✅");
+            leaderboardEl.innerHTML = "<p>排行榜已清空</p>";
+          })
+          .catch(err => {
+            alert("出錯：" + err.message);
+          });
+      }
+    });
+
+    window.onload = startGame;
+  </script>
+</body>
+</html>
