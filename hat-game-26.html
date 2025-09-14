@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>接帽遊戲</title>
+  <style>
+    * {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f8f8f8;
+      font-family: sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .game-container {
+      width: 100vw;
+      max-width: 420px;
+      aspect-ratio: 3 / 4;
+      position: relative;
+      overflow: hidden;
+      background: white;
+      border: 6px solid gold;
+      border-radius: 16px;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+    .game-inner {
+      width: 360px;
+      height: 480px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: top left;
+    }
+
+    #character-select,
+    #game-over {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(255,255,255,0.95);
+      text-align: center;
+    }
+
+    #character-options {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .character-choice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .character-choice img {
+      width: 48px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #player {
+      width: 40px;
+      height: 40px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+
+    .item {
+      width: 30px;
+      height: 30px;
+      position: absolute;
+      background-size: contain;
+      background-repeat: no-repeat;
+      top: 0;
+      z-index: 5;
+    }
+
+    #score, #timer {
+      position: absolute;
+      top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 20;
+    }
+
+    #score { left: 10px; }
+    #timer { right: 10px; }
+
+    input, button {
+      margin-top: 0.5rem;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    #name-input {
+      text-align: center;
+      width: 80%;
+    }
+
+    #leaderboard {
+      text-align: left;
+      font-size: 14px;
+      margin-top: 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      width: 100%;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    #restart-btn, #submit-btn, #try-again-btn {
+      margin-top: 10px;
+    }
+
+    #try-again-btn {
+      display: block;
+      margin: 10px auto 0;
+    }
+
+    #admin-clear {
+      margin-top: 10px;
+      font-size: 12px;
+      color: red;
+      cursor: pointer;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDTIK2NjCJlj9oPDqLXz8QmuStQdh0i-lw",
+  authDomain: "qqcats-hat.firebaseapp.com",
+  databaseURL: "https://qqcats-hat-default-rtdb.firebaseio.com",
+  projectId: "qqcats-hat",
+  storageBucket: "qqcats-hat.appspot.com",
+  messagingSenderId: "791295966582",
+  appId: "1:791295966582:web:9476b4aba98b8d9757ce57"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
+<script>
+const nameInput = document.createElement('input');
+nameInput.id = 'name-input';
+nameInput.placeholder = '你叫咩名？';
+nameInput.maxLength = 10;
+
+const submitBtn = document.createElement('button');
+submitBtn.id = 'submit-btn';
+submitBtn.disabled = true;
+submitBtn.textContent = '提交';
+
+const leaderboard = document.createElement('div');
+leaderboard.id = 'leaderboard';
+
+const tryAgainBtn = document.createElement('button');
+tryAgainBtn.id = 'try-again-btn';
+tryAgainBtn.textContent = '再玩一次';
+
+const adminClear = document.createElement('div');
+adminClear.id = 'admin-clear';
+adminClear.textContent = '🧹 清除排行榜（管理員專用）';
+adminClear.style.display = 'none';
+
+document.getElementById('game-over').appendChild(nameInput);
+document.getElementById('game-over').appendChild(submitBtn);
+document.getElementById('game-over').appendChild(leaderboard);
+document.getElementById('game-over').appendChild(tryAgainBtn);
+document.getElementById('game-over').appendChild(adminClear);
+
+// 輸入名時啟用提交掣
+nameInput.addEventListener('input', () => {
+  submitBtn.disabled = nameInput.value.trim() === '';
+});
+
+// 提交排分
+submitBtn.addEventListener('click', () => {
+  const name = nameInput.value.trim();
+  if (!name) return;
+  db.ref('leaderboard').push({ name, score });
+  submitBtn.disabled = true;
+  nameInput.disabled = true;
+  loadLeaderboard();
+  tryAgainBtn.style.display = 'block';
+});
+
+// 再玩一次
+tryAgainBtn.addEventListener('click', () => {
+  document.location.reload();
+});
+
+// 載入排行榜
+function loadLeaderboard() {
+  leaderboard.innerHTML = '<p>🏆 排行榜：</p>';
+  db.ref('leaderboard').orderByChild('score').once('value', snapshot => {
+    const entries = [];
+    snapshot.forEach(child => {
+      entries.push(child.val());
+    });
+    entries.sort((a, b) => b.score - a.score);
+    entries.forEach((entry, index) => {
+      leaderboard.innerHTML += `<div>${index + 1}. ${entry.name}：${entry.score}分</div>`;
+    });
+  });
+}
+
+// 顯示清除排行榜按鈕（需密碼）
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'c' && e.ctrlKey) {
+    const pwd = prompt('請輸入管理員密碼：');
+    if (pwd === 'admin123') {
+      adminClear.style.display = 'block';
+    }
+  }
+});
+
+// 點擊清除排行榜
+adminClear.addEventListener('click', () => {
+  if (confirm('確定要清除排行榜？')) {
+    db.ref('leaderboard').remove();
+    leaderboard.innerHTML = '<p>🏆 排行榜已清除。</p>';
+  }
+});
+</script>
+</body>
+</html>
