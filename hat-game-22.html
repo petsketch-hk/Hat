@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>接帽遊戲</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f8f8f8;
+      font-family: sans-serif;
+      height: 100%;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #game-root {
+      transform-origin: top left;
+      position: relative;
+    }
+
+    .game-frame {
+      width: 360px;
+      height: 480px;
+      background: white;
+      border: 6px solid gold;
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+
+    #character-select {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.95);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #character-options {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .character-choice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .character-choice img {
+      width: 60px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #player {
+      width: 60px;
+      height: 60px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+
+    .item {
+      width: 50px;
+      height: 50px;
+      position: absolute;
+      background-size: contain;
+      background-repeat: no-repeat;
+      top: 0;
+      z-index: 5;
+    }
+
+    #score, #timer {
+      position: absolute;
+      top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 20;
+    }
+
+    #score { left: 10px; }
+    #timer { right: 10px; }
+
+    #game-over {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 1rem;
+      z-index: 999;
+      border-radius: 10px;
+      text-align: center;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+
+    #leaderboard {
+      margin-top: 1rem;
+      background: #fff;
+      color: #000;
+      padding: 0.5rem;
+      border-radius: 6px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    input, button {
+      margin-top: 0.5rem;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-root">
+  <div class="game-frame" id="game">
+    <div id="character-select">
+      <h3>🐾 選擇角色</h3>
+      <div id="character-options">
+        <div class="character-choice">
+          <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6738.png?v=1757860381" data-key="xiaob">
+          <p>小B</p>
+        </div>
+        <div class="character-choice">
+          <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6737.png?v=1757860381" data-key="momo">
+          <p>Momo</p>
+        </div>
+        <div class="character-choice">
+          <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6726.png?v=1757693802" data-key="heungheung">
+          <p>香香</p>
+        </div>
+      </div>
+      <p>點選角色開始</p>
+    </div>
+    <div id="score">分數：0</div>
+    <div id="timer">時間：30</div>
+    <div id="player"></div>
+    <div id="game-over">
+      <h3>🎮 遊戲結束</h3>
+      <div id="below30">
+        <p>你得 <span id="final-score"></span> 分咋 🤏🏻<br>嗱嗱聲玩過啦！</p>
+        <button id="restart-btn">再玩一次</button>
+      </div>
+      <div id="above30" style="display:none;">
+        <p>恭喜你得分 <span id="final-score2"></span> 分 👏🏻</p>
+        <input id="name-input" type="text" placeholder="你叫咩名？" />
+        <br><button id="submit-btn">提交</button>
+        <div id="leaderboard"></div>
+        <button id="try-again-btn" style="display:none;">再玩一次</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDTIK2NjCJlj9oPDqLXz8QmuStQdh0i-lw",
+  authDomain: "qqcats-hat.firebaseapp.com",
+  databaseURL: "https://qqcats-hat-default-rtdb.firebaseio.com",
+  projectId: "qqcats-hat",
+  storageBucket: "qqcats-hat.appspot.com",
+  messagingSenderId: "791295966582",
+  appId: "1:791295966582:web:9476b4aba98b8d9757ce57",
+  measurementId: "G-J2FHPNW90V"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
+<script>
+const playerSkins = {
+  xiaob: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6738.png?v=1757860381',
+  momo: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6737.png?v=1757860381',
+  heungheung: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6726.png?v=1757693802'
+};
+const images = {
+  normal: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6735.png?v=1757747031',
+  bad: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6734.png?v=1757747042',
+  gold: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6731.png?v=1757694398',
+  logo: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6736.png?v=1757747016'
+};
+
+let selectedSkin = null;
+let score = 0, timeLeft = 30, gameEnded = false;
+let gameInterval, itemInterval;
+let playerX = 0, logoCount = 0;
+let moveInterval = null;
+let keyPressed = null;
+
+const game = document.getElementById('game');
+const player = document.getElementById('player');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+const gameOverBox = document.getElementById('game-over');
+const nameInput = document.getElementById('name-input');
+const submitBtn = document.getElementById('submit-btn');
+const leaderboardEl = document.getElementById('leaderboard');
+const restartBtn = document.getElementById('restart-btn');
+const tryAgainBtn = document.getElementById('try-again-btn');
+const finalScoreEl = document.getElementById('final-score');
+const finalScoreEl2 = document.getElementById('final-score2');
+const below30 = document.getElementById('below30');
+const above30 = document.getElementById('above30');
+
+document.querySelectorAll('#character-options img').forEach(img => {
+  img.addEventListener('click', () => {
+    selectedSkin = img.dataset.key;
+    document.getElementById('character-select').style.display = 'none';
+    player.style.backgroundImage = `url(${playerSkins[selectedSkin]})`;
+    startGame();
+  });
+});
+
+function startGame() {
+  score = 0;
+  timeLeft = 30;
+  gameEnded = false;
+  playerX = 0;
+  logoCount = 0;
+  document.querySelectorAll('.item').forEach(el => el.remove());
+  scoreEl.textContent = `分數：0`;
+  timerEl.textContent = `時間：30`;
+  player.style.transform = `translateX(-50%)`;
+  gameOverBox.style.display = 'none';
+  nameInput.value = '';
+  leaderboardEl.innerHTML = '';
+  tryAgainBtn.style.display = 'none';
+  gameInterval = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = `時間：${timeLeft}`;
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+  itemInterval = setInterval(spawnItem, 800);
+}
+
+function endGame() {
+  clearInterval(gameInterval);
+  clearInterval(itemInterval);
+  gameEnded = true;
+  gameOverBox.scrollTop = 0;
+  gameOverBox.style.display = 'block';
+  if (score < 30) {
+    finalScoreEl.textContent = score;
+    below30.style.display = 'block';
+    above30.style.display = 'none';
+  } else {
+    finalScoreEl2.textContent = score;
+    below30.style.display = 'none';
+    above30.style.display = 'block';
+  }
+}
+
+restartBtn.onclick = startGame;
+tryAgainBtn.onclick = () => {
+  document.getElementById('character-select').style.display = 'flex';
+  gameOverBox.style.display = 'none';
+};
+submitBtn.onclick = () => {
+  const name = nameInput.value.trim() || '無名氏';
+  const timestamp = Date.now();
+  db.ref("scores/" + timestamp).set({ name, score, time: timestamp }).then(showLeaderboard);
+};
+function showLeaderboard() {
+  db.ref("scores").once("value", snapshot => {
+    const data = snapshot.val() || {};
+    const entries = Object.values(data);
+    entries.sort((a, b) => b.score - a.score);
+    leaderboardEl.innerHTML = "<h4>🏆 排行榜</h4><ol>" +
+      entries.slice(0, 10).map(e => `<li>${e.name} - ${e.score}分</li>`).join("") +
+      "</ol>";
+    tryAgainBtn.style.display = 'inline-block';
+  });
+}
+
+function spawnItem() {
+  if (gameEnded) return;
+  const item = document.createElement('div');
+  const type = getRandomItemType();
+  if (type === 'logo') logoCount++;
+  item.className = 'item';
+  item.dataset.type = type;
+  item.style.backgroundImage = `url(${images[type]})`;
+  item.style.left = Math.random() * (game.clientWidth - 50) + 'px';
+  item.style.top = '0px';
+  game.appendChild(item);
+  let top = 0;
+  const speed = (type === 'logo' || type === 'gold') ? 6 : 3;
+  const fall = setInterval(() => {
+    if (gameEnded) { clearInterval(fall); item.remove(); return; }
+    top += speed;
+    item.style.top = `${top}px`;
+    const itemRect = item.getBoundingClientRect();
+    const playerRect = player.getBoundingClientRect();
+    if (
+      itemRect.bottom >= playerRect.top &&
+      itemRect.left < playerRect.right &&
+      itemRect.right > playerRect.left
+    ) {
+      clearInterval(fall); item.remove();
+      if (type === 'normal') score += 1;
+      if (type === 'gold') score += 3;
+      if (type === 'logo') score += 10;
+      if (type === 'bad') return endGame();
+      scoreEl.textContent = `分數：${score}`;
+    }
+    if (top > game.clientHeight) {
+      clearInterval(fall); item.remove();
+    }
+  }, 16);
+}
+
+function getRandomItemType() {
+  const weights = [
+    { type: 'normal', weight: 8 },
+    { type: 'bad', weight: 6 },
+    { type: 'gold', weight: 3 },
+    { type: 'logo', weight: logoCount < 1 ? 1 : 0 }
+  ];
+  const total = weights.reduce((sum, i) => sum + i.weight, 0);
+  const r = Math.random() * total;
+  let acc = 0;
+  for (const item of weights) {
+    acc += item.weight;
+    if (r < acc) return item.type;
+  }
+  return 'normal';
+}
+
+function movePlayer(dir) {
+  const maxOffset = game.clientWidth / 2 - player.offsetWidth / 2;
+  if (dir === 'left') playerX = Math.max(playerX - 10, -maxOffset);
+  else playerX = Math.min(playerX + 10, maxOffset);
+  player.style.left = `50%`;
+  player.style.transform = `translateX(${playerX}px) translateX(-50%)`;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    keyPressed = e.key;
+    if (!moveInterval) {
+      moveInterval = setInterval(() => {
+        movePlayer(keyPressed === 'ArrowLeft' ? 'left' : 'right');
+      }, 30);
+    }
+  }
+});
+document.addEventListener('keyup', () => {
+  keyPressed = null;
+  clearInterval(moveInterval);
+  moveInterval = null;
+});
+game.addEventListener('touchstart', e => {
+  const x = e.touches[0].clientX - game.getBoundingClientRect().left;
+  keyPressed = x < game.clientWidth / 2 ? 'ArrowLeft' : 'ArrowRight';
+  if (!moveInterval) {
+    moveInterval = setInterval(() => {
+      movePlayer(keyPressed === 'ArrowLeft' ? 'left' : 'right');
+    }, 30);
+  }
+});
+game.addEventListener('touchend', () => {
+  keyPressed = null;
+  clearInterval(moveInterval);
+  moveInterval = null;
+});
+
+// ✅ 自動縮放至裝置尺寸
+function resizeGame() {
+  const designWidth = 360, designHeight = 480;
+  const scaleX = window.innerWidth / designWidth;
+  const scaleY = window.innerHeight / designHeight;
+  const scale = Math.min(scaleX, scaleY);
+  document.getElementById('game-root').style.transform = `scale(${scale})`;
+}
+resizeGame();
+window.addEventListener('resize', resizeGame);
+document.addEventListener('touchend', (e) => {
+  const now = new Date().getTime();
+  if (window._lastTouch && now - window._lastTouch < 300) e.preventDefault();
+  window._lastTouch = now;
+}, { passive: false });
+</script>
+</body>
+</html>
