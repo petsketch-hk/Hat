@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>接帽遊戲 - QQCATS</title>
+  <style>
+    * {
+      user-select: none;
+      touch-action: manipulation;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f8f8f8;
+      font-family: sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .game-container {
+      width: 100vw;
+      max-width: 420px;
+      aspect-ratio: 3 / 4;
+      position: relative;
+      overflow: hidden;
+      background: white;
+      border: 6px solid gold;
+      border-radius: 16px;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+    .game-inner {
+      width: 360px;
+      height: 480px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: top left;
+      background-image: url('https://cdn.shopify.com/s/files/1/0661/7468/1319/files/1000198355.png?v=1757903719');
+      background-size: cover;
+      background-position: center;
+    }
+    .screen {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 100;
+      cursor: pointer;
+    }
+    #cover-screen {
+      background: url('https://cdn.shopify.com/s/files/1/0661/7468/1319/files/1000198475.gif?v=1757923709') no-repeat center / cover;
+    }
+    #howto-screen {
+      background: url('https://cdn.shopify.com/s/files/1/0661/7468/1319/files/1000198357.png?v=1757903719') no-repeat center / cover;
+      display: none;
+    }
+    #character-select,
+    #game-over {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(255,255,255,0.95);
+      text-align: center;
+      display: none;
+    }
+    #character-options {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .character-choice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .character-choice img {
+      width: 48px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+ #player {
+  width: 50px;
+  height: 50px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+.item {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  background-size: contain;
+  background-repeat: no-repeat;
+  top: 0;
+  z-index: 5;
+}
+
+    #score, #timer {
+      position: absolute;
+      top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 20;
+    }
+    #score { left: 10px; }
+    #timer { right: 10px; }
+    input, button {
+      margin-top: 0.5rem;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    #name-input {
+      text-align: center;
+      width: 80%;
+      display: none;
+    }
+    #submit-btn {
+      display: none;
+    }
+    #leaderboard {
+      text-align: left;
+      font-size: 14px;
+      margin-top: 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      width: 100%;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      display: none;
+    }
+    #try-again-btn {
+      margin-top: 10px;
+      display: none;
+    }
+    #admin-clear {
+      margin-top: 10px;
+      font-size: 12px;
+      color: red;
+      cursor: pointer;
+      display: none;
+    }
+    /* 全局防止選字／長按選單 */
+* {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+/* 保留 img 點擊功能，但封面除外 */
+#cover-screen img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+  </style>
+</head>
+<body>
+  <div class="game-container" id="game-wrapper">
+    <div class="game-inner" id="game">
+      <div class="screen" id="cover-screen"></div>
+      <div class="screen" id="howto-screen"></div>
+      <div id="character-select">
+        <h3>🐾 選擇角色</h3>
+        <div id="character-options">
+          <div class="character-choice">
+            <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6738.png?v=1757860381" data-key="xiaob">
+            <p>小B</p>
+          </div>
+          <div class="character-choice">
+            <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6737.png?v=1757860381" data-key="momo">
+            <p>Momo</p>
+          </div>
+          <div class="character-choice">
+            <img src="https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6726.png?v=1757693802" data-key="heungheung">
+            <p>香香</p>
+          </div>
+        </div>
+        <p>點選角色開始</p>
+      </div>
+      <div id="score">分數：0</div>
+      <div id="timer">時間：30</div>
+      <div id="player"></div>
+      <div id="game-over">
+        <h3>🎮 遊戲結束</h3>
+        <p>你得 <span id="final-score">0</span> 分！</p>
+        <input id="name-input" maxlength="10" placeholder="你叫咩名？" />
+        <button id="submit-btn" disabled>提交</button>
+        <div id="leaderboard"></div>
+        <button id="try-again-btn">再玩一次</button>
+        <div id="admin-clear">🧹 清除排行榜（管理員專用）</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDTIK2NjCJlj9oPDqLXz8QmuStQdh0i-lw",
+      authDomain: "qqcats-hat.firebaseapp.com",
+      databaseURL: "https://qqcats-hat-default-rtdb.firebaseio.com",
+      projectId: "qqcats-hat",
+      storageBucket: "qqcats-hat.appspot.com",
+      messagingSenderId: "791295966582",
+      appId: "1:791295966582:web:9476b4aba98b8d9757ce57"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const LOGICAL_WIDTH = 360;
+    const LOGICAL_HEIGHT = 480;
+    const playerSkins = {
+      xiaob: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6738.png?v=1757860381',
+      momo: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6737.png?v=1757860381',
+      heungheung: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6726.png?v=1757693802'
+    };
+    const hatImages = {
+      normal: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6758.png?v=1757939311',
+      bad: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6757.png?v=1757939311',
+      gold: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6756.png?v=1757939311',
+      logo: 'https://cdn.shopify.com/s/files/1/0661/7468/1319/files/IMG_6736.png?v=1757747016'
+    };
+
+    let selectedSkin = null;
+    let playerX = 0;
+    let score = 0;
+    let timeLeft = 30;
+    let gameEnded = false;
+    let spawnInterval, timerInterval;
+
+    const game = document.getElementById('game');
+    const player = document.getElementById('player');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const nameInput = document.getElementById('name-input');
+    const submitBtn = document.getElementById('submit-btn');
+    const leaderboard = document.getElementById('leaderboard');
+    const tryAgainBtn = document.getElementById('try-again-btn');
+    const adminClear = document.getElementById('admin-clear');
+
+    function vibrateFeedback(ms = 100) {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
+    document.getElementById('cover-screen').addEventListener('click', () => {
+      document.getElementById('cover-screen').style.display = 'none';
+      document.getElementById('howto-screen').style.display = 'block';
+    });
+    document.getElementById('howto-screen').addEventListener('click', () => {
+      document.getElementById('howto-screen').style.display = 'none';
+      document.getElementById('character-select').style.display = 'flex';
+    });
+
+    function resizeGame() {
+      const wrapper = document.getElementById('game-wrapper');
+      const g = document.getElementById('game');
+      const scale = wrapper.clientWidth / LOGICAL_WIDTH;
+      g.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', resizeGame);
+    resizeGame();
+
+    document.querySelectorAll('#character-options img').forEach(img => {
+      img.addEventListener('click', () => {
+        selectedSkin = img.dataset.key;
+        document.getElementById('character-select').style.display = 'none';
+        player.style.backgroundImage = `url(${playerSkins[selectedSkin]})`;
+        startGame();
+      });
+    });
+
+    function getRandomHatType() {
+      const rand = Math.random();
+      if (rand < 0.6) return 'normal';
+      if (rand < 0.65) return 'gold';
+      return 'bad';
+    }
+
+    function spawnItem(type = null) {
+      if (gameEnded) return;
+      const item = document.createElement('div');
+      item.className = 'item';
+      type = type || getRandomHatType();
+      item.dataset.type = type;
+      item.style.backgroundImage = `url(${hatImages[type]})`;
+      item.style.left = Math.random() * (LOGICAL_WIDTH - 30) + 'px';
+      item.style.top = '0px';
+      game.appendChild(item);
+
+      let y = 0;
+      let speed = 3;
+      if (type === 'gold') speed = 5;
+      if (type === 'logo') speed = 6;
+      if (type === 'bad') speed = 4;
+
+      const fall = setInterval(() => {
+        if (gameEnded) {
+          clearInterval(fall);
+          item.remove();
+          return;
+        }
+        y += speed;
+        item.style.top = `${y}px`;
+        const itemRect = item.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+        if (
+          itemRect.bottom >= playerRect.top &&
+          itemRect.left < playerRect.right &&
+          itemRect.right > playerRect.left
+        ) {
+          clearInterval(fall);
+          item.remove();
+          if (type === 'normal') {
+            score += 1;
+            vibrateFeedback(50);
+          }
+          if (type === 'gold') {
+            score += 3;
+            vibrateFeedback(100);
+          }
+          if (type === 'logo') {
+            score += 10;
+            vibrateFeedback(150);
+          }
+          if (type === 'bad') endGame();
+          scoreEl.textContent = `分數：${score}`;
+        }
+        if (y > LOGICAL_HEIGHT) {
+          clearInterval(fall);
+          item.remove();
+        }
+      }, 16);
+    }
+
+    function startGame() {
+      score = 0;
+      timeLeft = 30;
+      playerX = 0;
+      gameEnded = false;
+      scoreEl.textContent = '分數：0';
+      timerEl.textContent = '時間：30';
+      player.style.left = '50%';
+      player.style.transform = 'translateX(-50%)';
+      document.querySelectorAll('.item').forEach(i => i.remove());
+      document.getElementById('game-over').style.display = 'none';
+      nameInput.style.display = 'none';
+      nameInput.disabled = false;
+      nameInput.value = '';
+      submitBtn.style.display = 'none';
+      submitBtn.disabled = true;
+      leaderboard.style.display = 'none';
+      leaderboard.innerHTML = '';
+      tryAgainBtn.style.display = 'none';
+      adminClear.style.display = 'none';
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `時間：${timeLeft}`;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+
+      spawnInterval = setInterval(() => spawnItem(), 800);
+      setTimeout(() => spawnItem('logo'), Math.random() * 20000 + 5000);
+    }
+
+    function endGame() {
+      clearInterval(timerInterval);
+      clearInterval(spawnInterval);
+      gameEnded = true;
+      document.getElementById('final-score').textContent = score;
+      document.getElementById('game-over').style.display = 'flex';
+
+      if (score >= 30) {
+        nameInput.style.display = 'block';
+        submitBtn.style.display = 'block';
+        leaderboard.style.display = 'block';
+        loadLeaderboard();
+      } else {
+        tryAgainBtn.style.display = 'block';
+      }
+    }
+
+    function movePlayer(dir) {
+      const maxOffset = LOGICAL_WIDTH / 2 - 20;
+      if (dir === 'left') playerX = Math.max(playerX - 10, -maxOffset);
+      else playerX = Math.min(playerX + 10, maxOffset);
+      player.style.left = '50%';
+      player.style.transform = `translateX(-50%) translateX(${playerX}px)`;
+    }
+
+    let moveInterval = null;
+    let keyPressed = null;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        keyPressed = e.key;
+        if (!moveInterval) {
+          moveInterval = setInterval(() => {
+            movePlayer(keyPressed === 'ArrowLeft' ? 'left' : 'right');
+          }, 30);
+        }
+      }
+    });
+    document.addEventListener('keyup', () => {
+      keyPressed = null;
+      clearInterval(moveInterval);
+      moveInterval = null;
+    });
+
+    game.addEventListener('touchstart', e => {
+      const x = e.touches[0].clientX - game.getBoundingClientRect().left;
+      keyPressed = x < LOGICAL_WIDTH / 2 ? 'ArrowLeft' : 'ArrowRight';
+      if (!moveInterval) {
+        moveInterval = setInterval(() => {
+          movePlayer(keyPressed === 'ArrowLeft' ? 'left' : 'right');
+        }, 30);
+      }
+    });
+    game.addEventListener('touchend', () => {
+      keyPressed = null;
+      clearInterval(moveInterval);
+      moveInterval = null;
+    });
+
+    nameInput.addEventListener('input', () => {
+      submitBtn.disabled = nameInput.value.trim() === '';
+    });
+    submitBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      if (!name) return;
+      db.ref('leaderboard').push({ name, score });
+      submitBtn.disabled = true;
+      nameInput.disabled = true;
+      loadLeaderboard();
+      tryAgainBtn.style.display = 'block';
+    });
+    tryAgainBtn.addEventListener('click', () => {
+      location.reload();
+    });
+
+    function loadLeaderboard() {
+      leaderboard.innerHTML = '<p>🏆 排行榜：</p>';
+      db.ref('leaderboard').once('value', snapshot => {
+        const data = [];
+        snapshot.forEach(child => {
+          const val = child.val();
+          if (val.score >= 30) data.push(val);
+        });
+        data.sort((a, b) => b.score - a.score);
+        data.forEach((entry, i) => {
+          leaderboard.innerHTML += `<div>${i + 1}. ${entry.name}：${entry.score}分</div>`;
+        });
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'c' && e.ctrlKey) {
+        const pwd = prompt('請輸入管理員密碼：');
+        if (pwd === 'admin123') {
+          adminClear.style.display = 'block';
+        }
+      }
+    });
+    adminClear.addEventListener('click', () => {
+      if (confirm('確定清除排行榜？')) {
+        db.ref('leaderboard').remove();
+        leaderboard.innerHTML = '<p>🏆 排行榜已清除。</p>';
+      }
+    });
+  </script>
+  <script>
+  // 禁止 iOS Safari 雙擊放大
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', function (event) {
+    const now = new Date().getTime();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, false);
+</script>
+
+</body>
+</html>
